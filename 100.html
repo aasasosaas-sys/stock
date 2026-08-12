@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>メガ株式帝国 - 100社買収シミュレーター</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            900: '#134e4a',
+                            950: '#042f2e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #070a12;
+            color: #f1f5f9;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Mobile Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+
+        /* Glass Cards */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.4);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(51, 65, 85, 0.3);
+        }
+
+        /* Toast animation */
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-animate {
+            animation: slideInUp 0.25s ease-out forwards;
+        }
+
+        /* Safe area padding for bottom bar on modern iOS */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 12px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased pb-20 select-none">
+
+    <!-- Mobile Top Header Bar -->
+    <header class="sticky top-0 z-30 bg-slate-900/95 border-b border-slate-800/80 backdrop-blur-md px-3 py-2 shadow-md">
+        <div class="max-w-md mx-auto flex flex-col gap-1.5">
+            <!-- App Title Row & Speed Control -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="p-1.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg shadow text-black flex items-center justify-center">
+                        <i class="fa-solid fa-chart-line text-xs font-black"></i>
+                    </div>
+                    <h1 class="text-xs font-black tracking-tight text-white flex items-center gap-1.5">
+                        メガ株式帝国
+                        <span class="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">100社買収</span>
+                    </h1>
+                </div>
+
+                <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                    <button id="btn-pause" onclick="togglePause()" class="px-2 py-1 text-slate-300 hover:text-white transition" title="一時停止/再開">
+                        <i id="icon-pause" class="fa-solid fa-pause"></i>
+                    </button>
+                    <button onclick="setSpeed(1)" id="spd-1" class="px-1.5 py-0.5 font-bold rounded text-cyan-400 bg-slate-800">1x</button>
+                    <button onclick="setSpeed(2)" id="spd-2" class="px-1.5 py-0.5 font-bold rounded text-slate-400">2x</button>
+                    <button onclick="setSpeed(5)" id="spd-5" class="px-1.5 py-0.5 font-bold rounded text-slate-400">5x</button>
+                    <button onclick="saveGameToFirestore(true)" class="px-2 py-1 text-cyan-400 hover:text-cyan-200 transition ml-1 border-l border-slate-800" title="クラウド手動保存">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Global Financial Metrics (Mobile Compact 2x2 Grid) -->
+            <div class="grid grid-cols-2 gap-1.5 text-xs">
+                <!-- Cash -->
+                <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                    <div class="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <i class="fa-solid fa-wallet text-emerald-400 text-[10px]"></i> 所持金
+                    </div>
+                    <div id="stat-cash" class="font-mono font-extrabold text-emerald-400 text-xs">¥10,000</div>
+                </div>
+
+                <!-- Total Assets -->
+                <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                    <div class="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <i class="fa-solid fa-vault text-cyan-400 text-[10px]"></i> 総資産
+                    </div>
+                    <div id="stat-total-assets" class="font-mono font-extrabold text-cyan-400 text-xs">¥10,000</div>
+                </div>
+
+                <!-- Acquisitions -->
+                <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center justify-between">
+                    <div class="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                        <i class="fa-solid fa-crown text-amber-400 text-[10px]"></i> 完全買収
+                    </div>
+                    <div id="stat-acquired-count" class="font-mono font-extrabold text-amber-400 text-xs">0 / 100社</div>
+                </div>
+
+                <!-- Day & Economy -->
+                <div class="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800/80 flex items-center justify-between text-[10px]">
+                    <span class="text-slate-400"><strong id="stat-days" class="text-slate-200 font-mono">1</strong>日目</span>
+                    <span id="stat-econ-phase" class="text-emerald-400 font-bold">通常相場</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-md w-full mx-auto p-2.5 flex flex-col gap-3">
+
+        <!-- TAB 1: 株式市場 & 個別銘柄 (Mobile Stack / Toggle Layout) -->
+        <div id="tab-market" class="tab-content flex flex-col gap-3">
+            
+            <!-- Mobile Sub-Toggle Buttons: Chart vs List -->
+            <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-bold">
+                <button id="subtab-btn-chart" onclick="switchMarketSubtab('chart')" class="py-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-chart-line"></i> チャート & 取引
+                </button>
+                <button id="subtab-btn-list" onclick="switchMarketSubtab('list')" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-list-ul"></i> 全100社銘柄
+                </button>
+            </div>
+
+            <!-- Subtab Content A: Chart & Trading Panel -->
+            <div id="market-subtab-chart" class="flex flex-col gap-3">
+                <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-3">
+                    <!-- Stock Header Info -->
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span id="chart-title-category" class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-cyan-950 text-cyan-400 border border-cyan-800">Tech</span>
+                                <span id="chart-title-code" class="text-[10px] font-mono text-slate-400">#1001</span>
+                            </div>
+                            <h2 id="chart-title-name" class="text-xl font-black text-white mt-0.5">Appple (アップル)</h2>
+                            <p id="chart-title-desc" class="text-[11px] text-slate-400 line-clamp-1 mt-0.5">スマホ・デバイスの世界最大手パロディ</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-400 font-medium">現在株価</div>
+                            <div id="chart-price-current" class="text-xl font-mono font-extrabold text-emerald-400">¥1,200</div>
+                            <div id="chart-price-change" class="text-[11px] font-mono font-bold text-emerald-400">+1.5%</div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Chart Canvas -->
+                    <div class="relative w-full h-44 bg-slate-950/90 rounded-xl p-2 border border-slate-800">
+                        <canvas id="stockChart"></canvas>
+                    </div>
+
+                    <!-- Acquisition Progress Bar -->
+                    <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="text-slate-400">自社保有率: <strong id="chart-share-pct" class="text-white">0%</strong></span>
+                            <span class="text-slate-400"><strong id="chart-share-owned" class="text-cyan-400">0</strong> / <span id="chart-share-total">1,000</span> 株</span>
+                        </div>
+                        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                            <div id="chart-share-bar" class="bg-gradient-to-r from-cyan-500 to-amber-400 h-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div id="chart-acquisition-badge" class="hidden text-[10px] text-amber-400 font-bold flex items-center justify-center gap-1 mt-0.5">
+                            <i class="fa-solid fa-crown"></i> 完全買収完了！日次役員報酬発生中
+                        </div>
+                    </div>
+
+                    <!-- Mobile Touch-Optimized Trading Console -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col gap-2.5">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-slate-400">
+                            <span>一括購入数量選択</span>
+                            <span>概算: <strong id="trade-cost-estimate" class="text-white font-mono">¥1,200</strong></span>
+                        </div>
+
+                        <!-- Touch Qty Select Buttons Grid -->
+                        <div class="grid grid-cols-6 gap-1 text-xs font-mono font-bold">
+                            <button onclick="setTradeQty(1)" class="qty-btn min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center active:scale-95 transition">1</button>
+                            <button onclick="setTradeQty(10)" class="qty-btn min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center active:scale-95 transition">10</button>
+                            <button onclick="setTradeQty(100)" class="qty-btn min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center active:scale-95 transition">100</button>
+                            <button onclick="setTradeQty(1000)" class="qty-btn min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center active:scale-95 transition">1k</button>
+                            <button onclick="setTradeQty('max')" class="qty-btn min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center active:scale-95 transition">Max</button>
+                            <button onclick="setTradeQty('takeover')" class="qty-btn min-h-[38px] bg-amber-950/80 hover:bg-amber-900 text-amber-300 rounded-lg border border-amber-800 flex items-center justify-center active:scale-95 transition">100%</button>
+                        </div>
+
+                        <!-- Action Trade Buttons -->
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button onclick="executeBuy()" class="min-h-[44px] bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/50 transition flex items-center justify-center gap-1.5 text-xs">
+                                <i class="fa-solid fa-cart-shopping"></i> 株式を購入
+                            </button>
+                            <button onclick="executeSell()" class="min-h-[44px] bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-rose-950/50 transition flex items-center justify-center gap-1.5 text-xs">
+                                <i class="fa-solid fa-hand-holding-dollar"></i> 株式を売却
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subtab Content B: Stock Search & List Panel -->
+            <div id="market-subtab-list" class="hidden flex-col gap-3">
+                <div class="glass-panel p-3 rounded-2xl border border-slate-800 shadow-xl flex flex-col h-[520px]">
+                    <!-- Filters & Search -->
+                    <div class="flex flex-col gap-2 pb-2 border-b border-slate-800">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-slate-200">100社パロディ銘柄一覧</span>
+                            <span class="text-slate-400 font-mono text-[10px]" id="stock-list-count">100社</span>
+                        </div>
+
+                        <div class="flex gap-1.5">
+                            <div class="relative flex-1">
+                                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-[10px] text-slate-500"></i>
+                                <input type="text" id="stock-search-input" oninput="filterStockList()" placeholder="社名・コード検索..." class="w-full bg-slate-950 text-xs pl-7 pr-2 py-1.5 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500 text-slate-200">
+                            </div>
+                            <select id="stock-category-select" onchange="filterStockList()" class="bg-slate-950 text-[11px] px-2 py-1.5 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500 text-slate-300 font-semibold">
+                                <option value="ALL">全業種</option>
+                                <option value="Tech">テック</option>
+                                <option value="Auto">自動車</option>
+                                <option value="Finance">金融</option>
+                                <option value="Retail">小売</option>
+                                <option value="Media">エンタメ</option>
+                                <option value="Pharma">製薬</option>
+                                <option value="Energy">エネルギー</option>
+                                <option value="Industry">重工</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable Stock Items -->
+                    <div id="stock-list-container" class="flex-1 overflow-y-auto space-y-1.5 pr-0.5 mt-2">
+                        <!-- Dynamically filled -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TAB 2: 自社経営 & リスク管理 -->
+        <div id="tab-company" class="tab-content hidden flex-col gap-3">
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-4">
+                
+                <!-- Player Work & Large Action Button -->
+                <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950 p-4 rounded-2xl border border-cyan-900/50 flex flex-col items-center text-center gap-3 shadow-lg">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-bold">
+                        <i class="fa-solid fa-hammer"></i> 業務・経営アクティビティ
+                    </span>
+                    <h3 class="text-base font-bold text-white">自社業務を実行して即時報酬獲得</h3>
+                    <p class="text-[11px] text-slate-300">
+                        自社レベルおよび100%買収完了した子会社群からの役員手当が報酬に加算されます。
+                    </p>
+                    
+                    <button onclick="executeWork()" class="w-full min-h-[56px] bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-slate-950 font-black rounded-2xl shadow-xl shadow-cyan-500/20 text-base transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-hand-holding-dollar text-xl"></i> 業務を実行 (+<span id="work-reward-display" class="font-mono">¥50</span>)
+                    </button>
+                </div>
+
+                <!-- Industry Sector Selection -->
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-cyan-900/40 flex flex-col gap-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-cyan-400 font-bold uppercase">自社参入・主力業種</span>
+                        <select id="player-industry-select" onchange="setPlayerIndustry(this.value)" class="bg-slate-950 text-cyan-300 text-xs font-bold border border-cyan-700/60 rounded-xl px-3 py-1.5 focus:outline-none">
+                            <option value="Tech">テック (Tech)</option>
+                            <option value="Auto">自動車 (Auto)</option>
+                            <option value="Finance">金融 (Finance)</option>
+                            <option value="Retail">小売・飲食 (Retail)</option>
+                            <option value="Media">エンタメ (Media)</option>
+                            <option value="Pharma">製薬 (Pharma)</option>
+                            <option value="Energy">エネルギー (Energy)</option>
+                            <option value="Industry">重工 (Industry)</option>
+                        </select>
+                    </div>
+                    <p class="text-[10px] text-slate-400">選択業種は自社規模や買収率により業界株価への波及バフが発生します。</p>
+                </div>
+
+                <!-- Sector Dynamic Monitor Grid -->
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                    <h3 class="text-[11px] font-bold text-slate-300 uppercase mb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-sitemap text-cyan-400 mr-1"></i> 業界潮流 & 波及モニター</span>
+                    </h3>
+                    <div id="sector-monitor-grid" class="grid grid-cols-2 gap-1.5">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Company Metrics Card Grid -->
+                <div class="grid grid-cols-1 gap-2.5">
+                    <!-- Level & Upgrade -->
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                        <div>
+                            <div class="text-[10px] text-slate-400 font-bold">自社事業レベル</div>
+                            <div id="comp-lv-display" class="text-xl font-extrabold text-cyan-400">Lv.1</div>
+                        </div>
+                        <button onclick="upgradeCompany()" id="btn-upgrade-comp" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl border border-cyan-500 active:scale-95 transition">
+                            拡大 (¥5,000)
+                        </button>
+                    </div>
+
+                    <!-- Expenses & Risk -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <div class="text-[10px] text-slate-400 font-bold">日次維持費用</div>
+                            <div id="comp-daily-cost" class="text-base font-extrabold text-rose-400 mt-0.5">¥10</div>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <div class="text-[10px] text-slate-400 font-bold">倒産危機リスク</div>
+                            <div id="comp-risk-level" class="text-base font-extrabold text-amber-400 mt-0.5">極小 (1%)</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB 3: 銀行 & 金融資産 -->
+        <div id="tab-banking" class="tab-content hidden flex-col gap-3">
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-3">
+                <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2">
+                    <i class="fa-solid fa-building-columns text-emerald-400"></i> 中央銀行 & 国債金融
+                </h2>
+
+                <!-- Ordinary Savings -->
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block">普通預金残高</span>
+                            <span id="bank-savings-amount" class="text-base font-mono font-bold text-emerald-400">¥0</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">金利 0.1%/日</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="bankDepositPrompt()" class="min-h-[38px] bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition">預け入れ</button>
+                        <button onclick="bankWithdrawPrompt()" class="min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition">引き出し</button>
+                    </div>
+                </div>
+
+                <!-- High-Yield Term Deposits -->
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block">高利回り 30日定期預金</span>
+                            <span class="text-[10px] text-slate-400">満期時に利率15%獲得</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">0.5%/日</span>
+                    </div>
+                    <button onclick="createTermDepositPrompt()" class="w-full min-h-[38px] bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition">定期預金を開始</button>
+                    <div id="term-deposits-list" class="space-y-1 text-[10px] text-slate-400 max-h-24 overflow-y-auto">
+                        <!-- Active term deposits -->
+                    </div>
+                </div>
+
+                <!-- Bank Loans -->
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block">銀行借入金残高</span>
+                            <span id="bank-loan-amount" class="text-base font-mono font-bold text-rose-400">¥0</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-rose-400 bg-rose-950 px-2 py-0.5 rounded border border-rose-800">借入金利 0.3%/日</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="takeLoanPrompt()" class="min-h-[38px] bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition">融資を受ける</button>
+                        <button onclick="repayLoanPrompt()" class="min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition">借入金を返済</button>
+                    </div>
+                </div>
+
+                <!-- Government Bonds -->
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block">保有国債額</span>
+                            <span id="bonds-amount" class="text-base font-mono font-bold text-amber-400">¥0</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-800">利息 0.15%/日</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="buyBondsPrompt()" class="min-h-[38px] bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition">国債を購入</button>
+                        <button onclick="sellBondsPrompt()" class="min-h-[38px] bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition">国債を売却</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: 保有株・完全子会社 -->
+        <div id="tab-portfolio" class="tab-content hidden flex-col gap-3">
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-3">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-crown text-amber-400"></i> 保有株式 & 完全子会社
+                    </h2>
+                </div>
+
+                <div id="portfolio-grid" class="grid grid-cols-1 gap-2 max-h-[500px] overflow-y-auto">
+                    <!-- Dynamically filled with owned stocks -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: 景気・政策 & ニュース速報 -->
+        <div id="tab-economy" class="tab-content hidden flex-col gap-3">
+            <!-- Macro Economy Status Card -->
+            <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-2.5">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                    <i class="fa-solid fa-globe text-cyan-400"></i> マクロ経済 & 政府方針
+                </h3>
+
+                <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                    <div class="text-[10px] text-slate-400 font-bold">現在の景気サイクル</div>
+                    <div id="econ-phase-title" class="text-base font-black text-emerald-400">通常相場 (NORMAL)</div>
+                </div>
+
+                <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                    <div class="text-[10px] text-slate-400 font-bold">発動中の政府方針・政策</div>
+                    <div id="econ-policy-name" class="text-xs font-bold text-cyan-300">大規模金融緩和策</div>
+                    <p id="econ-policy-msg" class="text-[10px] text-slate-400">市場流動性が高まり全体株価が微増傾向。</p>
+                </div>
+            </div>
+
+            <!-- News Feed Log -->
+            <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 shadow-xl flex flex-col h-[350px]">
+                <h3 class="text-xs font-bold text-white flex items-center gap-1.5 border-b border-slate-800 pb-2 mb-2">
+                    <i class="fa-solid fa-newspaper text-amber-400"></i> 経済ニュース & 総合速報
+                </h3>
+
+                <div id="news-log-container" class="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
+                    <!-- News Items -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Fixed Mobile Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-2 pt-1.5 pb-safe flex justify-around text-[10px] font-semibold text-slate-400 shadow-2xl">
+        <button onclick="switchTab('market')" id="tab-btn-market" class="tab-btn active flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl text-cyan-400">
+            <i class="fa-solid fa-chart-line text-sm"></i>
+            <span>株式市場</span>
+        </button>
+        <button onclick="switchTab('company')" id="tab-btn-company" class="tab-btn flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl">
+            <i class="fa-solid fa-building text-sm"></i>
+            <span>自社経営</span>
+        </button>
+        <button onclick="switchTab('banking')" id="tab-btn-banking" class="tab-btn flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl">
+            <i class="fa-solid fa-piggy-bank text-sm"></i>
+            <span>銀行金融</span>
+        </button>
+        <button onclick="switchTab('portfolio')" id="tab-btn-portfolio" class="tab-btn flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl">
+            <i class="fa-solid fa-briefcase text-sm"></i>
+            <span>保有株式</span>
+        </button>
+        <button onclick="switchTab('economy')" id="tab-btn-economy" class="tab-btn flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl">
+            <i class="fa-solid fa-globe text-sm"></i>
+            <span>景気ニュース</span>
+        </button>
+    </nav>
+
+    <!-- Custom Touch Modal Overlay -->
+    <div id="custom-modal-overlay" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div id="custom-modal-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-xs w-full shadow-2xl flex flex-col gap-3 text-slate-100">
+            <h3 id="modal-title" class="text-base font-bold text-white">数量・金額入力</h3>
+            <p id="modal-desc" class="text-xs text-slate-400">数値を入力してください。</p>
+            <input type="number" id="modal-input" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-cyan-500" placeholder="0">
+            <div class="flex justify-end gap-2 mt-1">
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition">キャンセル</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-cyan-600 text-white text-xs font-bold rounded-xl transition">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-amber-500/80 rounded-3xl p-6 max-w-xs w-full shadow-2xl text-center flex flex-col items-center gap-4">
+            <div class="p-4 bg-amber-950/80 rounded-full text-amber-400 border border-amber-500/50 text-4xl">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-amber-400">全100社 完全買収完了！</h2>
+                <p class="text-xs text-slate-300 mt-1">
+                    おめでとうございます！世界の全100社を買収し「メガ株式帝国」を樹立しました！
+                </p>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 w-full text-xs font-mono space-y-1">
+                <div>クリア日数: <strong id="vic-days" class="text-cyan-400">--</strong> 日</div>
+                <div>最終総資産: <strong id="vic-assets" class="text-emerald-400">--</strong></div>
+            </div>
+            <button onclick="location.reload()" class="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black rounded-xl shadow-lg transition text-xs">
+                最初からプレイする
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-16 left-3 right-3 z-50 flex flex-col gap-1.5 pointer-events-none items-center"></div>
+
+    <script>
+        /* -------------------------------------------------------------
+           1. GAME STATE & DATA STRUCTURES
+           ------------------------------------------------------------- */
+        const gameState = {
+            days: 1,
+            isPaused: false,
+            speed: 1,
+            cash: 10000,
+            holdings: {}, // companyId: ownedShares count
+
+            // Player Company State
+            companyLevel: 1,
+            baseWorkReward: 50,
+            dailyBaseCost: 10,
+            playerIndustry: "Tech",
+
+            // Economy & Policy
+            economyPhase: 'NORMAL',
+            economyMultiplier: 1.0,
+            policy: {
+                name: "大規模金融緩和策",
+                effectMsg: "市場流動性が高まり全体株価が微増傾向",
+                marketBias: 0.01
+            },
+
+            // Sector Modifiers
+            sectorModifiers: {
+                Tech: 1.0, Auto: 1.0, Finance: 1.0, Retail: 1.0,
+                Media: 1.0, Pharma: 1.0, Energy: 1.0, Industry: 1.0
+            },
+
+            // Banking & Financial Assets
+            bankSavings: 0,
+            termDeposits: [],
+            bankLoan: 0,
+            bonds: 0,
+
+            // Active Selected Stock Trading
+            selectedCompanyId: 1001,
+            selectedQty: 1,
+            activeMarketSubtab: 'chart',
+
+            companies: []
+        };
+
+        const SECTOR_RIPPLE_MAP = {
+            Tech: { Media: 0.4, Retail: 0.3, Energy: -0.2 },
+            Auto: { Industry: 0.4, Energy: 0.3, Retail: 0.2 },
+            Finance: { Tech: 0.3, Auto: 0.3, Industry: 0.3 },
+            Retail: { Media: 0.2, Auto: 0.2 },
+            Media: { Tech: 0.2, Retail: 0.3 },
+            Pharma: { Retail: 0.1 },
+            Energy: { Auto: -0.4, Industry: -0.3, Tech: -0.2 },
+            Industry: { Auto: 0.3, Energy: 0.3 }
+        };
+
+        const COMPANY_SEEDS = [
+            // Tech (15)
+            { id: 1001, name: "Appple", code: "APPL", cat: "Tech", price: 1200, desc: "スマホ・デバイスの世界最大手パロディ" },
+            { id: 1002, name: "Googol", code: "GOOG", cat: "Tech", price: 1500, desc: "世界最強の検索エンジン＆AI開発企業" },
+            { id: 1003, name: "Amaznn", code: "AMZN", cat: "Tech", price: 1800, desc: "世界を覆うEC＆クラウドインフラ巨人" },
+            { id: 1004, name: "Microsofft", code: "MSFT", cat: "Tech", price: 1600, desc: "OSとビジネスソフトの絶対的覇者" },
+            { id: 1005, name: "Metaa", code: "META", cat: "Tech", price: 900, desc: "巨大SNSネットワークとメタバース開発" },
+            { id: 1006, name: "Nvidda", code: "NVDA", cat: "Tech", price: 2200, desc: "AI時代を牽引する半導体チップ王者" },
+            { id: 1007, name: "Samssung", code: "SMSN", cat: "Tech", price: 800, desc: "家電と半導体メモリの巨大総合テック" },
+            { id: 1008, name: "Twitttr", code: "TWTR", cat: "Tech", price: 450, desc: "リアルタイム情報の短文SNSプラットフォーム" },
+            { id: 1009, name: "Netfflix", code: "NFLX", cat: "Tech", price: 1100, desc: "世界中の視聴者を魅了する動画配信" },
+            { id: 1010, name: "Abobe", code: "ADBE", cat: "Tech", price: 950, desc: "クリエイター必須のデザイン・画像ツール" },
+            { id: 1011, name: "Orecle", code: "ORCL", cat: "Tech", price: 700, desc: "企業向けエンタープライズデータベース" },
+            { id: 1012, name: "Salessforce", code: "CRM", cat: "Tech", price: 850, desc: "クラウド顧客管理CRMの先駆者" },
+            { id: 1013, name: "Spottify", code: "SPOT", cat: "Tech", price: 500, desc: "世界規模の音楽ストリーミングサービス" },
+            { id: 1014, name: "Uberr", code: "UBER", cat: "Tech", price: 600, desc: "配車アプリとフードデリバリー" },
+            { id: 1015, name: "Airbnbb", code: "ABNB", cat: "Tech", price: 650, desc: "民泊と旅行体験のシェアリングプラットフォーム" },
+
+            // Auto (12)
+            { id: 2001, name: "Toyoda", code: "TYDA", cat: "Auto", price: 1400, desc: "世界トップクラスの自動車生産台数を誇る" },
+            { id: 2002, name: "Teslla", code: "TSLA", cat: "Auto", price: 2100, desc: "EV電気自動車と自動運転技術の革新者" },
+            { id: 2003, name: "Nissa", code: "NISS", cat: "Auto", price: 400, desc: "技術のパロディ自動車メーカー" },
+            { id: 2004, name: "Hondda", code: "HND", cat: "Auto", price: 750, desc: "二輪と四輪の高品質エンジニアリング" },
+            { id: 2005, name: "BMWw", code: "BMWW", cat: "Auto", price: 1100, desc: "ドイツ発プレミアム高級乗用車" },
+            { id: 2006, name: "Mercedez", code: "MBZ", cat: "Auto", price: 1300, desc: "伝統と格式を誇る高級車ブランド" },
+            { id: 2007, name: "Fordd", code: "FORD", cat: "Auto", price: 550, desc: "アメリカ自動車産業の伝統的パイオニア" },
+            { id: 2008, name: "Porosche", code: "POR", cat: "Auto", price: 2500, desc: "憧れの超高性能スポーツカー" },
+            { id: 2009, name: "Hyundaii", code: "HYUN", cat: "Auto", price: 600, desc: "急速に世界シェアを広げる新鋭" },
+            { id: 2010, name: "Ferrarii", code: "RARI", cat: "Auto", price: 3200, desc: "最高級レーシング・スーパーカー" },
+            { id: 2011, name: "Vollks", code: "VW", cat: "Auto", price: 850, desc: "欧州最大級の自動車メーカーグループ" },
+            { id: 2012, name: "Subaruu", code: "SUB", cat: "Auto", price: 680, desc: "4WD技術と安全性で根強いファンを持つ" },
+
+            // Finance (13)
+            { id: 3001, name: "Golldman", code: "GS", cat: "Finance", price: 1900, desc: "ウォール街を動かす最強投資銀行" },
+            { id: 3002, name: "JPMorogan", code: "JPM", cat: "Finance", price: 1700, desc: "世界最大級の金融メガバンク" },
+            { id: 3003, name: "Chasse", code: "CHS", cat: "Finance", price: 1200, desc: "広範な個人・法人向けリテール銀行" },
+            { id: 3004, name: "Citiigroup", code: "CITI", cat: "Finance", price: 800, desc: "グローバルに展開する国際金融サービス" },
+            { id: 3005, name: "Mizuho0", code: "MZH", cat: "Finance", price: 500, desc: "大企業取引に強みを持つ日本のメガバンク" },
+            { id: 3006, name: "SMBCc", code: "SMBC", cat: "Finance", price: 600, desc: "機動的な展開を強みとする金融グループ" },
+            { id: 3007, name: "Nomuraa", code: "NMR", cat: "Finance", price: 450, desc: "国内最大手の証券投資銀行" },
+            { id: 3008, name: "Berkshiree", code: "BRK", cat: "Finance", price: 4500, desc: "伝説の投資家が率いる巨大持株会社" },
+            { id: 3009, name: "Allianzz", code: "ALZ", cat: "Finance", price: 1100, desc: "欧州最大の国際総合保険グループ" },
+            { id: 3010, name: "Vissas", code: "VSA", cat: "Finance", price: 2000, desc: "世界中の決済を支えるクレジットネットワーク" },
+            { id: 3011, name: "Masterrcard", code: "MA", cat: "Finance", price: 1950, desc: "高い世界シェアを誇る電子決済インフラ" },
+            { id: 3012, name: "PayPaall", code: "PYPL", cat: "Finance", price: 750, desc: "オンライン決済の世界的パイオニア" },
+            { id: 3013, name: "SoftBnk", code: "SFTB", cat: "Finance", price: 1300, desc: "世界中のAI・テック企業へ投資するファンド" },
+
+            // Retail & Food (15)
+            { id: 4001, name: "FastRtailing", code: "UNIQ", cat: "Retail", price: 1600, desc: "高品質カジュアル衣服「Uniqloo」を展開" },
+            { id: 4002, name: "Walmarrt", code: "WMT", cat: "Retail", price: 1100, desc: "世界最大の売り上げを誇る超巨大スーパー" },
+            { id: 4003, name: "Costcco", code: "COST", cat: "Retail", price: 2300, desc: "会員制ホールセール・大量販売" },
+            { id: 4004, name: "Targett", code: "TGT", cat: "Retail", price: 900, desc: "おしゃれな日用品を揃える大型ディスカウント" },
+            { id: 4005, name: "Starducks", code: "SBUX", cat: "Retail", price: 950, desc: "世界中を魅了する特別カフェ空間" },
+            { id: 4006, name: "Sevenn", code: "SVN", cat: "Retail", price: 650, desc: "24時間暮らしを支えるコンビニ最大手" },
+            { id: 4007, name: "Lawsonn", code: "LWS", cat: "Retail", price: 550, desc: "マチの健康と憩いを届けるコンビニ" },
+            { id: 4008, name: "McDonaldds", code: "MCD", cat: "Retail", price: 1400, desc: "圧倒的世界シェアを誇るバーガーチェーン" },
+            { id: 4009, name: "KFCC", code: "KFCC", cat: "Retail", price: 700, desc: "秘伝のスパイスフライドチキン" },
+            { id: 4010, name: "Nitori", code: "NTR", cat: "Retail", price: 1050, desc: "お・ねだん以上。家具インテリア" },
+            { id: 4011, name: "Aeonn", code: "AEON", cat: "Retail", price: 500, desc: "地域密着型の巨大ショッピングモール" },
+            { id: 4012, name: "Ikea", code: "IKEA", cat: "Retail", price: 800, desc: "北欧デザインの組み立て家具" },
+            { id: 4013, name: "Zerra", code: "ZRA", cat: "Retail", price: 1200, desc: "最新トレンドを瞬時に届けるファストファッション" },
+            { id: 4014, name: "Dominos", code: "DMNO", cat: "Retail", price: 850, desc: "アツアツの宅配ピザネットワーク" },
+            { id: 4015, name: "StarSweets", code: "SWET", cat: "Retail", price: 350, desc: "若者に大人気のパロディ洋菓子チェーン" },
+
+            // Media & Entertainment (12)
+            { id: 5001, name: "Nintendoo", code: "NTDO", cat: "Media", price: 2800, desc: "世界中から愛されるゲームIPとハード製造" },
+            { id: 5002, name: "Disneey", code: "DIS", cat: "Media", price: 1500, desc: "夢と感動を届けるテーマパークと映画帝国" },
+            { id: 5003, name: "Sonyy", code: "SONY", cat: "Media", price: 1700, desc: "ゲーム、音楽、映画、エレクトロニクス" },
+            { id: 5004, name: "BandaiI", code: "BNDI", cat: "Media", price: 900, desc: "アニメ・ホビー・トイの巨大コンテンツ" },
+            { id: 5005, name: "Toho", code: "TOHO", cat: "Media", price: 1100, desc: "日本映画の配給・劇場・不動産最大手" },
+            { id: 5006, name: "SquareEnix", code: "SQEX", cat: "Media", price: 800, desc: "国民的RPGタイトルを抱えるゲーム会社" },
+            { id: 5007, name: "Segaa", code: "SEGA", cat: "Media", price: 600, desc: "アーケードと人気キャラクターコンテンツ" },
+            { id: 5008, name: "Warneer", code: "WBD", cat: "Media", price: 650, desc: "映画スタジオとテレビネットワーク" },
+            { id: 5009, name: "Paraamount", code: "PARA", cat: "Media", price: 500, desc: "ハリウッド老舗の映画製作・配信" },
+            { id: 5010, name: "Kadowaka", code: "KDW", cat: "Media", price: 750, desc: "出版・Webメディア・アニメの総合メディア" },
+            { id: 5011, name: "YouTube", code: "UTUB", cat: "Media", price: 2000, desc: "動画クリエイターが集う世界最大のメディア" },
+            { id: 5012, name: "TikTokk", code: "TTK", cat: "Media", price: 1800, desc: "Z世代を熱狂させるショート動画アプリ" },
+
+            // Pharma (11)
+            { id: 6001, name: "Takedda", code: "TKD", cat: "Pharma", price: 950, desc: "日本の伝統とグローバル創薬を持つ製薬大手" },
+            { id: 6002, name: "Pfizerr", code: "PFE", cat: "Pharma", price: 1200, desc: "世界を救うワクチンと先端医薬品" },
+            { id: 6003, name: "Modderna", code: "MRNA", cat: "Pharma", price: 1100, desc: "mRNA技術を活用したバイオ創薬" },
+            { id: 6004, name: "Rochee", code: "RCH", cat: "Pharma", price: 1600, desc: "がん治療薬と体外診断の世界的リーダー" },
+            { id: 6005, name: "Novartis", code: "NVS", cat: "Pharma", price: 1400, desc: "最先端ゲノム医療と革新的創薬" },
+            { id: 6006, name: "Bayerr", code: "BAYR", cat: "Pharma", price: 800, desc: "ヘルスケアとアグリサイエンスの総合大手" },
+            { id: 6007, name: "Astraa", code: "AZN", cat: "Pharma", price: 1500, desc: "英スウェーデン系の国際製薬バイオ" },
+            { id: 6008, name: "Johnsonn", code: "JNJ", cat: "Pharma", price: 1750, desc: "ヘルスケア製品と医療機器の超安定企業" },
+            { id: 6009, name: "Shionogi", code: "SHIO", cat: "Pharma", price: 900, desc: "感染症治療薬に強みを持つ実力派" },
+            { id: 6010, name: "Chugai", code: "CHUG", cat: "Pharma", price: 1050, desc: "バイオ医薬品で業界をリード" },
+            { id: 6011, name: "Eisai", code: "ESAI", cat: "Pharma", price: 850, desc: "認知症治療薬などの神経領域で世界貢献" },
+
+            // Energy (11)
+            { id: 7001, name: "Exxonn", code: "XOM", cat: "Energy", price: 1300, desc: "石油・天然ガスの世界最大級エネルギー企業" },
+            { id: 7002, name: "Shell", code: "SHEL", cat: "Energy", price: 1250, desc: "欧州発の国際石油資本（メジャー）" },
+            { id: 7003, name: "Chevroonn", code: "CVX", cat: "Energy", price: 1350, desc: "世界中でエネルギー資源を開発" },
+            { id: 7004, name: "Tepco", code: "TEP", cat: "Energy", price: 400, desc: "首都圏の電力供給を支えるインフラ" },
+            { id: 7005, name: "SaudiAram", code: "ARM", cat: "Energy", price: 2900, desc: "圧倒的な原油埋蔵量を誇る国営エネルギー" },
+            { id: 7006, name: "TotalE", code: "TTE", cat: "Energy", price: 1100, desc: "再生可能エネルギーシフトを進めるメジャー" },
+            { id: 7007, name: "BPp", code: "BPP", cat: "Energy", price: 900, desc: "英国発の総合エネルギー探鉱" },
+            { id: 7008, name: "ChubuElec", code: "CBE", cat: "Energy", price: 450, desc: "中部エリアの電力とエネルギーインフラ" },
+            { id: 7009, name: "KansaiElec", code: "KNE", cat: "Energy", price: 480, desc: "関西エリアの安定電力供給" },
+            { id: 7010, name: "Eneos", code: "ENE", cat: "Energy", price: 520, desc: "国内スタンドシェア圧倒的ナンバーワン" },
+            { id: 7011, name: "Gazpromm", code: "GAZ", cat: "Energy", price: 700, desc: "天然ガスパイプラインの巨大企業" },
+
+            // Industry & Heavy Machinery (11)
+            { id: 8001, name: "MitsubishiInd", code: "MHI", cat: "Industry", price: 1800, desc: "発電プラント、航空宇宙、防衛重工最大手" },
+            { id: 8002, name: "Boeingg", code: "BA", cat: "Industry", price: 2100, desc: "世界を飛ぶジェット旅客機と宇宙防衛" },
+            { id: 8003, name: "Airbus", code: "AIR", cat: "Industry", price: 2200, desc: "欧州の航空宇宙・旅客機製造巨人" },
+            { id: 8004, name: "Lockheedd", code: "LMT", cat: "Industry", price: 3000, desc: "最先端ステルス戦闘機・防衛システム" },
+            { id: 8005, name: "Komattsu", code: "KMT", cat: "Industry", price: 1200, desc: "世界中で働く建設機械・鉱山機械" },
+            { id: 8006, name: "Caterpillarr", code: "CAT", cat: "Industry", price: 2400, desc: "黄色のボディでお馴染みの建設機械世界王者" },
+            { id: 8007, name: "Daikin", code: "DKN", cat: "Industry", price: 1500, desc: "世界中の快適空間を作る空調世界トップ" },
+            { id: 8008, name: "Fanuc", code: "FNC", cat: "Industry", price: 1300, desc: "黄色い産業用ロボットと工場自動化（FA）" },
+            { id: 8009, name: "Kubota", code: "KBT", cat: "Industry", price: 850, desc: "食料と水を支える農業機械・水道パイプ" },
+            { id: 8010, name: "Hitachi", code: "HTC", cat: "Industry", price: 1600, desc: "社会インフラとITを高度に融合" },
+            { id: 8011, name: "Siemenss", code: "SIE", cat: "Industry", price: 1750, desc: "ドイツ発の産業オートメーションと医療機器" }
+        ];
+
+        let chartInstance = null;
+        let gameInterval = null;
+
+        // Cloud Storage State
+        let db = null;
+        let auth = null;
+
+        /* -------------------------------------------------------------
+           2. INITIALIZATION & MAIN GAME LOOP
+           ------------------------------------------------------------- */
+        window.onload = function() {
+            initCompanies();
+            initChart();
+            updateAllUI();
+            
+            gameInterval = setInterval(gameTick, 1000);
+            addNews("メガ株式帝国へようこそ！ライバル100社を買収して世界経済を支配しましょう。", "system");
+
+            initFirebase();
+        };
+
+        async function initFirebase() {
+            try {
+                if (typeof __firebase_config === 'undefined') return;
+                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                const { getAuth, signInAnonymously, signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                const { getFirestore } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                let userCredential;
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    userCredential = await signInAnonymously(auth);
+                }
+
+                if (userCredential && userCredential.user) {
+                    await loadGameFromFirestore();
+                }
+            } catch (e) {
+                console.warn("Cloud save initialized failed or offline:", e);
+            }
+        }
+
+        async function saveGameToFirestore(isManual = false) {
+            if (!db || !auth || !auth.currentUser) {
+                if (isManual) showToast("⚠️ オフラインのため保存できません", "amber");
+                return;
+            }
+            try {
+                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const userId = auth.currentUser.uid;
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'saveState');
+
+                const saveData = {
+                    days: gameState.days,
+                    cash: gameState.cash,
+                    holdings: gameState.holdings,
+                    companyLevel: gameState.companyLevel,
+                    baseWorkReward: gameState.baseWorkReward,
+                    dailyBaseCost: gameState.dailyBaseCost,
+                    playerIndustry: gameState.playerIndustry,
+                    economyPhase: gameState.economyPhase,
+                    economyMultiplier: gameState.economyMultiplier,
+                    policy: gameState.policy,
+                    sectorModifiers: gameState.sectorModifiers,
+                    bankSavings: gameState.bankSavings,
+                    termDeposits: gameState.termDeposits,
+                    bankLoan: gameState.bankLoan,
+                    bonds: gameState.bonds,
+                    companies: gameState.companies.map(c => ({
+                        id: c.id,
+                        price: c.price,
+                        prevPrice: c.prevPrice,
+                        history: c.history
+                    })),
+                    updatedAt: Date.now()
+                };
+
+                await setDoc(docRef, saveData, { merge: true });
+                if (isManual) {
+                    showToast("☁️ セーブデータをクラウドに保存しました", "cyan");
+                }
+            } catch (err) {
+                console.error("Save error:", err);
+                if (isManual) showToast("⚠️ セーブに失敗しました", "rose");
+            }
+        }
+
+        async function loadGameFromFirestore() {
+            if (!db || !auth || !auth.currentUser) return;
+            try {
+                const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const userId = auth.currentUser.uid;
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'gameData', 'saveState');
+
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.days) gameState.days = data.days;
+                    if (data.cash !== undefined) gameState.cash = data.cash;
+                    if (data.holdings) gameState.holdings = data.holdings;
+                    if (data.companyLevel) gameState.companyLevel = data.companyLevel;
+                    if (data.baseWorkReward) gameState.baseWorkReward = data.baseWorkReward;
+                    if (data.dailyBaseCost) gameState.dailyBaseCost = data.dailyBaseCost;
+                    if (data.playerIndustry) gameState.playerIndustry = data.playerIndustry;
+                    if (data.economyPhase) gameState.economyPhase = data.economyPhase;
+                    if (data.economyMultiplier) gameState.economyMultiplier = data.economyMultiplier;
+                    if (data.policy) gameState.policy = data.policy;
+                    if (data.sectorModifiers) gameState.sectorModifiers = data.sectorModifiers;
+                    if (data.bankSavings !== undefined) gameState.bankSavings = data.bankSavings;
+                    if (data.termDeposits) gameState.termDeposits = data.termDeposits;
+                    if (data.bankLoan !== undefined) gameState.bankLoan = data.bankLoan;
+                    if (data.bonds !== undefined) gameState.bonds = data.bonds;
+
+                    if (data.companies && Array.isArray(data.companies)) {
+                        data.companies.forEach(savedC => {
+                            const comp = gameState.companies.find(c => c.id === savedC.id);
+                            if (comp) {
+                                comp.price = savedC.price;
+                                comp.prevPrice = savedC.prevPrice;
+                                comp.history = savedC.history || [savedC.price];
+                            }
+                        });
+                    }
+
+                    showToast("☁️ セーブデータを読み込みました", "emerald");
+                    updateAllUI();
+                }
+            } catch (err) {
+                console.error("Load error:", err);
+            }
+        }
+
+        function gameTick() {
+            if (gameState.isPaused) return;
+
+            for (let s = 0; s < gameState.speed; s++) {
+                gameState.days++;
+                updateEconomicCycle();
+                updateSectorDynamics();
+                updateStockPrices();
+                processDailyFinances();
+                checkBankruptcyRisk();
+                triggerRandomNewsEvents();
+            }
+
+            // Auto-save every 10 days
+            if (gameState.days % 10 === 0) {
+                saveGameToFirestore(false);
+            }
+
+            checkVictoryCondition();
+            updateAllUI();
+        }
+
+        function initCompanies() {
+            gameState.companies = COMPANY_SEEDS.map(seed => {
+                return {
+                    id: seed.id,
+                    name: seed.name,
+                    code: seed.code,
+                    category: seed.cat,
+                    price: seed.price,
+                    basePrice: seed.price,
+                    prevPrice: seed.price,
+                    totalShares: 1000,
+                    volatility: 0.015 + Math.random() * 0.02,
+                    history: [seed.price],
+                    desc: seed.desc
+                };
+            });
+        }
+
+        function gameTick() {
+            if (gameState.isPaused) return;
+
+            for (let s = 0; s < gameState.speed; s++) {
+                gameState.days++;
+                updateEconomicCycle();
+                updateSectorDynamics();
+                updateStockPrices();
+                processDailyFinances();
+                checkBankruptcyRisk();
+                triggerRandomNewsEvents();
+            }
+
+            checkVictoryCondition();
+            updateAllUI();
+        }
+
+        /* -------------------------------------------------------------
+           3. ECONOMIC CYCLES & STOCK CALCULATIONS
+           ------------------------------------------------------------- */
+        function updateEconomicCycle() {
+            if (Math.random() < 0.03) {
+                const phases = ['NORMAL', 'BOOM', 'RECESSION', 'BUBBLE'];
+                const newPhase = phases[Math.floor(Math.random() * phases.length)];
+                
+                if (newPhase !== gameState.economyPhase) {
+                    const oldPhase = gameState.economyPhase;
+                    gameState.economyPhase = newPhase;
+
+                    if (oldPhase === 'BUBBLE' && newPhase !== 'BUBBLE') {
+                        const dropRatio = 0.20 + Math.random() * 0.15;
+                        gameState.companies.forEach(comp => {
+                            comp.prevPrice = comp.price;
+                            comp.price = Math.max(10, Math.round(comp.price * (1 - dropRatio)));
+                            comp.history.push(comp.price);
+                            if (comp.history.length > 30) comp.history.shift();
+                        });
+                        addNews(`💥【バブル崩壊】狂乱バブルが弾けました！全銘柄の株価が平均 ${(dropRatio * 100).toFixed(1)}% 大暴落！`, "down");
+                    }
+
+                    switch (newPhase) {
+                        case 'NORMAL':
+                            gameState.economyMultiplier = 1.0;
+                            if (oldPhase !== 'BUBBLE') addNews("🌐 経済状況は安定した【通常相場】に戻りました。", "system");
+                            break;
+                        case 'BOOM':
+                            gameState.economyMultiplier = 1.05;
+                            addNews("📈 景気拡大！【好況サイクル】に入り全体株価が微増中！", "up");
+                            break;
+                        case 'RECESSION':
+                            gameState.economyMultiplier = 0.95;
+                            addNews("📉 景気減速…【不況サイクル】突入により相場に押し目。", "down");
+                            break;
+                        case 'BUBBLE':
+                            gameState.economyMultiplier = 1.15;
+                            addNews("🚀 熱狂！【狂乱バブル景気】が到来！全銘柄が急騰中！", "up");
+                            break;
+                    }
+                }
+            }
+
+            if (Math.random() < 0.02) {
+                const policies = [
+                    { name: "大規模金融緩和策", effectMsg: "市場流動性が高まり全体株価が微増傾向", marketBias: 0.015 },
+                    { name: "ゼロ金利継続宣言", effectMsg: "低金利により企業投資が活発化", marketBias: 0.01 },
+                    { name: "法人税引き上げ閣議決定", effectMsg: "企業利益を圧迫し株価にやや下落圧力", marketBias: -0.012 },
+                    { name: "先端IT・半導体国家支援法", effectMsg: "ハイテク・IT銘柄を中心に強力な好影響", marketBias: 0.02 },
+                    { name: "環境エネルギー増税規制", effectMsg: "エネルギー・製造業のコスト負担増懸念", marketBias: -0.008 }
+                ];
+                gameState.policy = policies[Math.floor(Math.random() * policies.length)];
+                addNews(`🏛️ 【政府発表】政策転換「${gameState.policy.name}」が表明されました。`, "system");
+            }
+        }
+
+        function updateSectorDynamics() {
+            let playerSectorShares = 0;
+            let playerSectorTotal = 0;
+            gameState.companies.forEach(comp => {
+                if (comp.category === gameState.playerIndustry) {
+                    playerSectorTotal += comp.totalShares;
+                    playerSectorShares += (gameState.holdings[comp.id] || 0);
+                }
+            });
+
+            const playerSectorShareRatio = playerSectorTotal > 0 ? (playerSectorShares / playerSectorTotal) : 0;
+            const playerBoost = (gameState.companyLevel * 0.003) + (playerSectorShareRatio * 0.02);
+
+            gameState.sectorModifiers[gameState.playerIndustry] = 1.0 + playerBoost;
+
+            if (Math.random() < 0.08) {
+                const sectors = Object.keys(gameState.sectorModifiers);
+                const targetSec = sectors[Math.floor(Math.random() * sectors.length)];
+                const isPositive = Math.random() > 0.45;
+                const shockAmt = isPositive ? (0.03 + Math.random() * 0.04) : (-0.03 - Math.random() * 0.04);
+                gameState.sectorModifiers[targetSec] += shockAmt;
+            }
+
+            const newModifiers = { ...gameState.sectorModifiers };
+            Object.keys(SECTOR_RIPPLE_MAP).forEach(sourceSec => {
+                const sourceMod = gameState.sectorModifiers[sourceSec] - 1.0;
+                if (Math.abs(sourceMod) > 0.01) {
+                    const ripples = SECTOR_RIPPLE_MAP[sourceSec];
+                    Object.keys(ripples).forEach(targetSec => {
+                        const weight = ripples[targetSec];
+                        newModifiers[targetSec] += sourceMod * weight * 0.15;
+                    });
+                }
+            });
+
+            Object.keys(newModifiers).forEach(sec => {
+                newModifiers[sec] = 1.0 + (newModifiers[sec] - 1.0) * 0.95;
+                newModifiers[sec] = Math.max(0.7, Math.min(1.4, newModifiers[sec]));
+            });
+
+            gameState.sectorModifiers = newModifiers;
+        }
+
+        function updateStockPrices() {
+            const acquiredCount = getAcquiredCount();
+
+            gameState.companies.forEach(comp => {
+                comp.prevPrice = comp.price;
+                const randomComponent = (Math.random() - 0.5) * comp.volatility;
+                const policyBias = gameState.policy.marketBias * 0.4;
+                const econMultiplier = (gameState.economyMultiplier - 1.0) * 0.4;
+                const sectorBias = ((gameState.sectorModifiers[comp.category] || 1.0) - 1.0) * 0.25;
+                const takeoverConfidence = acquiredCount * 0.000015;
+
+                const priceRatio = comp.price / (comp.basePrice || comp.price);
+                let overvalueDrag = 0;
+                
+                if (priceRatio > 1.2) {
+                    overvalueDrag = -0.005 * Math.min(priceRatio - 1.2, 4);
+                } else if (priceRatio < 0.8) {
+                    overvalueDrag = 0.003 * Math.min(0.8 - priceRatio, 0.5);
+                }
+
+                let netChange = randomComponent + policyBias + econMultiplier + sectorBias + takeoverConfidence + overvalueDrag;
+                netChange = Math.max(-0.06, Math.min(0.06, netChange));
+
+                let newPrice = Math.round(comp.price * (1 + netChange));
+                if (newPrice < 10) newPrice = 10;
+                
+                const maxAllowedPrice = Math.round((comp.basePrice || 1000) * 8);
+                if (newPrice > maxAllowedPrice) newPrice = maxAllowedPrice;
+
+                comp.price = newPrice;
+                comp.history.push(newPrice);
+                if (comp.history.length > 30) comp.history.shift();
+            });
+        }
+
+        /* -------------------------------------------------------------
+           4. WORK & FINANCIAL MANAGEMENT
+           ------------------------------------------------------------- */
+        function executeWork() {
+            const reward = calculateWorkReward();
+            gameState.cash += reward;
+            showToast(`💼 業務完了！ +¥${reward.toLocaleString()}`, "emerald");
+            updateAllUI();
+        }
+
+        function calculateWorkReward() {
+            let reward = gameState.baseWorkReward + (gameState.companyLevel - 1) * 50;
+            gameState.companies.forEach(comp => {
+                const owned = gameState.holdings[comp.id] || 0;
+                if (owned >= comp.totalShares) {
+                    reward += Math.round(comp.price * 0.005);
+                }
+            });
+            return reward;
+        }
+
+        function upgradeCompany() {
+            const cost = gameState.companyLevel * 5000;
+            if (gameState.cash < cost) {
+                showToast("所持金が足りません！", "rose");
+                return;
+            }
+
+            gameState.cash -= cost;
+            gameState.companyLevel++;
+            showToast(`🏢 自社レベルが Lv.${gameState.companyLevel} にアップ！`, "cyan");
+            addNews(`🏢 自社レベルが Lv.${gameState.companyLevel} に上昇。労働報酬と維持費が増加。`, "system");
+            updateAllUI();
+        }
+
+        function processDailyFinances() {
+            let totalDividend = 0;
+            gameState.companies.forEach(comp => {
+                const owned = gameState.holdings[comp.id] || 0;
+                if (owned > 0) {
+                    const div = Math.round(owned * comp.price * 0.0002);
+                    totalDividend += div;
+                    if (owned >= comp.totalShares) {
+                        totalDividend += Math.round(comp.price * 0.01);
+                    }
+                }
+            });
+
+            const savingsInterest = Math.round(gameState.bankSavings * 0.0001);
+            const loanInterest = Math.round(gameState.bankLoan * 0.003);
+
+            let termMaturedTotal = 0;
+            gameState.termDeposits = gameState.termDeposits.filter(td => {
+                td.daysLeft--;
+                if (td.daysLeft <= 0) {
+                    const payout = Math.round(td.amount * (1 + td.rate));
+                    termMaturedTotal += payout;
+                    addNews(`🏦 満期！定期預金 ¥${payout.toLocaleString()} が口座へ入金。`, "up");
+                    return false;
+                }
+                return true;
+            });
+
+            const bondCoupon = Math.round(gameState.bonds * 0.0002);
+            const acquiredCount = getAcquiredCount();
+            const dailyExpense = (gameState.companyLevel * gameState.dailyBaseCost) + (acquiredCount * 50);
+
+            const netIncome = totalDividend + savingsInterest + bondCoupon + termMaturedTotal - loanInterest - dailyExpense;
+            gameState.cash += netIncome;
+            gameState.bankSavings += savingsInterest;
+
+            if (loanInterest > 0) {
+                gameState.bankLoan += loanInterest;
+            }
+        }
+
+        function checkBankruptcyRisk() {
+            let riskChance = 0.005;
+            if (gameState.cash < 0) riskChance += 0.05;
+            if (gameState.bankLoan > calculateTotalAssets() * 0.8) riskChance += 0.03;
+
+            const acquiredCount = getAcquiredCount();
+            riskChance = Math.max(0.001, riskChance - (acquiredCount * 0.001));
+
+            if (gameState.cash < -50000 && Math.random() < riskChance) {
+                addNews("⚠️ 【経営危機】資金不足により緊急融資手形（¥50,000）が発生しました。", "down");
+                gameState.bankLoan += 50000;
+                gameState.cash += 50000;
+                showToast("⚠️ 資金ショートで緊急融資が発生", "rose");
+            }
+        }
+
+        function triggerRandomNewsEvents() {
+            if (Math.random() < 0.1) {
+                const comp = gameState.companies[Math.floor(Math.random() * gameState.companies.length)];
+                const isGood = Math.random() > 0.45;
+                const percentShift = isGood ? (0.15 + Math.random() * 0.2) : (-0.15 - Math.random() * 0.2);
+
+                comp.price = Math.round(comp.price * (1 + percentShift));
+                if (comp.price < 10) comp.price = 10;
+
+                const newsType = isGood ? "up" : "down";
+                const directionText = isGood ? "暴騰！" : "暴落…";
+                const reasonsGood = ["新技術特許を取得", "四半期決算が予想超過", "好調な新製品ライン発表"];
+                const reasonsBad = ["製品欠陥の大規模回収発表", "当局からの独占調査受け", "決算下振れ発表"];
+
+                const reason = isGood 
+                    ? reasonsGood[Math.floor(Math.random() * reasonsGood.length)]
+                    : reasonsBad[Math.floor(Math.random() * reasonsBad.length)];
+
+                addNews(`📢 [${comp.name}] ${reason}により株価が${directionText} (${(percentShift * 100).toFixed(1)}%)`, newsType);
+            }
+        }
+
+        /* -------------------------------------------------------------
+           5. STOCK TRADING LOGIC
+           ------------------------------------------------------------- */
+        function getSelectedCompany() {
+            return gameState.companies.find(c => c.id === gameState.selectedCompanyId) || gameState.companies[0];
+        }
+
+        function setTradeQty(qty) {
+            gameState.selectedQty = qty;
+            document.querySelectorAll('.qty-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-cyan-400', 'bg-cyan-900');
+            });
+            event.target.classList.add('ring-2', 'ring-cyan-400');
+            updateTradeCostEstimate();
+        }
+
+        function calculateActualTradeQty(comp) {
+            const owned = gameState.holdings[comp.id] || 0;
+            const remaining = comp.totalShares - owned;
+
+            if (gameState.selectedQty === 'max') {
+                const affordable = Math.floor(gameState.cash / comp.price);
+                return Math.max(0, Math.min(affordable, remaining));
+            } else if (gameState.selectedQty === 'takeover') {
+                return remaining;
+            } else {
+                return Math.min(parseInt(gameState.selectedQty), remaining);
+            }
+        }
+
+        function updateTradeCostEstimate() {
+            const comp = getSelectedCompany();
+            const qty = calculateActualTradeQty(comp);
+            const cost = qty * comp.price;
+            
+            const costElem = document.getElementById('trade-cost-estimate');
+            if (costElem) costElem.innerText = `¥${cost.toLocaleString()} (${qty}株)`;
+        }
+
+        function executeBuy() {
+            const comp = getSelectedCompany();
+            const qty = calculateActualTradeQty(comp);
+
+            if (qty <= 0) {
+                showToast("購入できる数量がありません", "rose");
+                return;
+            }
+
+            const totalCost = qty * comp.price;
+            if (gameState.cash < totalCost) {
+                showToast("手元所持金が足りません！", "rose");
+                return;
+            }
+
+            gameState.cash -= totalCost;
+            gameState.holdings[comp.id] = (gameState.holdings[comp.id] || 0) + qty;
+
+            const wasAcquired = (gameState.holdings[comp.id] - qty) < comp.totalShares && gameState.holdings[comp.id] >= comp.totalShares;
+
+            showToast(`🛒 [${comp.name}] ${qty}株を ¥${totalCost.toLocaleString()} で購入！`, "emerald");
+            
+            if (wasAcquired) {
+                addNews(`🎉 祝！[${comp.name}] の全株式100%を取得し、完全子会社化しました！`, "up");
+            }
+
+            updateAllUI();
+        }
+
+        function executeSell() {
+            const comp = getSelectedCompany();
+            const owned = gameState.holdings[comp.id] || 0;
+
+            if (owned <= 0) {
+                showToast("売却できる保有株がありません", "rose");
+                return;
+            }
+
+            let qtyToSell = 0;
+            if (gameState.selectedQty === 'max' || gameState.selectedQty === 'takeover') {
+                qtyToSell = owned;
+            } else {
+                qtyToSell = Math.min(parseInt(gameState.selectedQty), owned);
+            }
+
+            const totalRevenue = qtyToSell * comp.price;
+            gameState.cash += totalRevenue;
+            gameState.holdings[comp.id] -= qtyToSell;
+
+            showToast(`💰 [${comp.name}] ${qtyToSell}株を ¥${totalRevenue.toLocaleString()} で売却！`, "cyan");
+            updateAllUI();
+        }
+
+        /* -------------------------------------------------------------
+           6. BANKING & MODAL PROMPTS
+           ------------------------------------------------------------- */
+        let activeModalAction = null;
+
+        function openModal(title, desc, confirmCallback) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            document.getElementById('modal-input').value = '';
+            activeModalAction = confirmCallback;
+            
+            const overlay = document.getElementById('custom-modal-overlay');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            document.getElementById('modal-input').focus();
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById('custom-modal-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
+        document.getElementById('modal-confirm-btn').onclick = function() {
+            const val = parseInt(document.getElementById('modal-input').value);
+            if (isNaN(val) || val <= 0) {
+                showToast("有効な数字を入力してください", "rose");
+                return;
+            }
+            if (activeModalAction) activeModalAction(val);
+            closeModal();
+            updateAllUI();
+        };
+
+        function bankDepositPrompt() {
+            openModal("普通預金 預け入れ", `預け入れる金額を入力してください (手元: ¥${gameState.cash.toLocaleString()})`, (val) => {
+                if (gameState.cash < val) { showToast("所持金が不足しています", "rose"); return; }
+                gameState.cash -= val;
+                gameState.bankSavings += val;
+                showToast(`預金完了: ¥${val.toLocaleString()}`, "emerald");
+            });
+        }
+
+        function bankWithdrawPrompt() {
+            openModal("普通預金 引き出し", `引き出す金額を入力してください (預金残高: ¥${gameState.bankSavings.toLocaleString()})`, (val) => {
+                if (gameState.bankSavings < val) { showToast("預金残高が不足しています", "rose"); return; }
+                gameState.bankSavings -= val;
+                gameState.cash += val;
+                showToast(`引き出し完了: ¥${val.toLocaleString()}`, "cyan");
+            });
+        }
+
+        function createTermDepositPrompt() {
+            openModal("30日定期預金", `預け入れる金額を入力してください (手元: ¥${gameState.cash.toLocaleString()})`, (val) => {
+                if (gameState.cash < val) { showToast("所持金が不足しています", "rose"); return; }
+                gameState.cash -= val;
+                gameState.termDeposits.push({ amount: val, daysLeft: 30, rate: 0.15 });
+                showToast(`30日定期預金（¥${val.toLocaleString()}）を開始`, "cyan");
+            });
+        }
+
+        function takeLoanPrompt() {
+            openModal("銀行融資", "融資を受ける金額を入力してください (日次金利: 0.3%)", (val) => {
+                gameState.bankLoan += val;
+                gameState.cash += val;
+                showToast(`融資実行: ¥${val.toLocaleString()} を借入`, "amber");
+            });
+        }
+
+        function repayLoanPrompt() {
+            openModal("借入金 返済", `返済する金額を入力してください (借入残高: ¥${gameState.bankLoan.toLocaleString()})`, (val) => {
+                const repayAmt = Math.min(val, gameState.bankLoan);
+                if (gameState.cash < repayAmt) { showToast("所持金が不足しています", "rose"); return; }
+                gameState.cash -= repayAmt;
+                gameState.bankLoan -= repayAmt;
+                showToast(`返済完了: ¥${repayAmt.toLocaleString()}`, "emerald");
+            });
+        }
+
+        function buyBondsPrompt() {
+            openModal("国債 購入", `購入する額面を入力してください (手元: ¥${gameState.cash.toLocaleString()})`, (val) => {
+                if (gameState.cash < val) { showToast("所持金が不足しています", "rose"); return; }
+                gameState.cash -= val;
+                gameState.bonds += val;
+                showToast(`国債購入完了: ¥${val.toLocaleString()}`, "amber");
+            });
+        }
+
+        function sellBondsPrompt() {
+            openModal("国債 売却", `売却する額面を入力してください (保有国債: ¥${gameState.bonds.toLocaleString()})`, (val) => {
+                if (gameState.bonds < val) { showToast("保有国債が不足しています", "rose"); return; }
+                gameState.bonds -= val;
+                gameState.cash += val;
+                showToast(`国債売却完了: ¥${val.toLocaleString()}`, "cyan");
+            });
+        }
+
+        function setPlayerIndustry(ind) {
+            gameState.playerIndustry = ind;
+            showToast(`自社参入業種を [${ind}] に変更`, "cyan");
+            addNews(`🏢 自社が主力参入業種を [${ind}] に指定。`, "system");
+            updateAllUI();
+        }
+
+        /* -------------------------------------------------------------
+           7. CHART & UI RENDERING ENGINE
+           ------------------------------------------------------------- */
+        function initChart() {
+            const canvas = document.getElementById('stockChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 30}, (_, i) => i + 1),
+                    datasets: [{
+                        label: '株価',
+                        data: [],
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        fill: true,
+                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 9 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!chartInstance) return;
+            const comp = getSelectedCompany();
+            if (!comp) return;
+
+            chartInstance.data.labels = comp.history.map((_, i) => i + 1);
+            chartInstance.data.datasets[0].data = comp.history;
+
+            const isUp = comp.price >= comp.prevPrice;
+            chartInstance.data.datasets[0].borderColor = isUp ? '#10b981' : '#f43f5e';
+            chartInstance.data.datasets[0].backgroundColor = isUp ? 'rgba(16, 185, 129, 0.08)' : 'rgba(244, 63, 94, 0.08)';
+
+            chartInstance.update('none');
+        }
+
+        function switchMarketSubtab(subtab) {
+            gameState.activeMarketSubtab = subtab;
+            const chartPanel = document.getElementById('market-subtab-chart');
+            const listPanel = document.getElementById('market-subtab-list');
+            const btnChart = document.getElementById('subtab-btn-chart');
+            const btnList = document.getElementById('subtab-btn-list');
+
+            if (subtab === 'chart') {
+                chartPanel.classList.remove('hidden');
+                listPanel.classList.add('hidden');
+                btnChart.className = 'py-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 transition flex items-center justify-center gap-1.5';
+                btnList.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5';
+            } else {
+                chartPanel.classList.add('hidden');
+                listPanel.classList.remove('hidden');
+                btnList.className = 'py-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800 transition flex items-center justify-center gap-1.5';
+                btnChart.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5';
+            }
+        }
+
+        function updateAllUI() {
+            document.getElementById('stat-days').innerText = gameState.days;
+            document.getElementById('stat-cash').innerText = `¥${Math.round(gameState.cash).toLocaleString()}`;
+            
+            const totalAssets = calculateTotalAssets();
+            document.getElementById('stat-total-assets').innerText = `¥${Math.round(totalAssets).toLocaleString()}`;
+            
+            const acquired = getAcquiredCount();
+            document.getElementById('stat-acquired-count').innerText = `${acquired} / 100社`;
+
+            const phaseLabels = { NORMAL: "通常相場", BOOM: "景気拡大", RECESSION: "景気減速", BUBBLE: "狂乱バブル" };
+            document.getElementById('stat-econ-phase').innerText = phaseLabels[gameState.economyPhase];
+
+            const comp = getSelectedCompany();
+            document.getElementById('chart-title-name').innerText = comp.name;
+            document.getElementById('chart-title-code').innerText = `#${comp.id}`;
+            document.getElementById('chart-title-category').innerText = comp.category;
+            document.getElementById('chart-title-desc').innerText = comp.desc;
+            document.getElementById('chart-price-current').innerText = `¥${comp.price.toLocaleString()}`;
+
+            const changePct = (((comp.price - comp.prevPrice) / comp.prevPrice) * 100).toFixed(1);
+            const changeElem = document.getElementById('chart-price-change');
+            changeElem.innerText = `${changePct >= 0 ? '+' : ''}${changePct}%`;
+            changeElem.className = `text-[11px] font-mono font-bold ${changePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            const owned = gameState.holdings[comp.id] || 0;
+            const pct = ((owned / comp.totalShares) * 100).toFixed(1);
+            document.getElementById('chart-share-pct').innerText = `${pct}%`;
+            document.getElementById('chart-share-owned').innerText = owned.toLocaleString();
+            document.getElementById('chart-share-bar').style.width = `${pct}%`;
+
+            const badge = document.getElementById('chart-acquisition-badge');
+            if (owned >= comp.totalShares) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            updateChart();
+            updateTradeCostEstimate();
+            renderStockList();
+            renderSectorMonitorGrid();
+
+            document.getElementById('work-reward-display').innerText = `¥${calculateWorkReward().toLocaleString()}`;
+            document.getElementById('comp-lv-display').innerText = `Lv.${gameState.companyLevel}`;
+            document.getElementById('comp-daily-cost').innerText = `¥${(gameState.companyLevel * gameState.dailyBaseCost).toLocaleString()}`;
+            
+            const btnUpgrade = document.getElementById('btn-upgrade-comp');
+            if (btnUpgrade) btnUpgrade.innerText = `事業拡大 (¥${(gameState.companyLevel * 5000).toLocaleString()})`;
+
+            document.getElementById('bank-savings-amount').innerText = `¥${Math.round(gameState.bankSavings).toLocaleString()}`;
+            document.getElementById('bank-loan-amount').innerText = `¥${Math.round(gameState.bankLoan).toLocaleString()}`;
+            document.getElementById('bonds-amount').innerText = `¥${Math.round(gameState.bonds).toLocaleString()}`;
+
+            const termList = document.getElementById('term-deposits-list');
+            if (termList) {
+                termList.innerHTML = gameState.termDeposits.length === 0 ? '<div class="text-[10px] text-slate-500">稼働中の定期預金はありません</div>' : '';
+                gameState.termDeposits.forEach((td, i) => {
+                    termList.innerHTML += `<div class="flex justify-between border-b border-slate-800/50 py-0.5"><span>#${i+1} ¥${td.amount.toLocaleString()}</span><span>残り${td.daysLeft}日</span></div>`;
+                });
+            }
+
+            document.getElementById('econ-phase-title').innerText = `${phaseLabels[gameState.economyPhase]} (${gameState.economyPhase})`;
+            document.getElementById('econ-policy-name').innerText = gameState.policy.name;
+            document.getElementById('econ-policy-msg').innerText = gameState.policy.effectMsg;
+
+            renderPortfolioTab();
+        }
+
+        function renderStockList() {
+            const container = document.getElementById('stock-list-container');
+            if (!container) return;
+
+            const searchVal = (document.getElementById('stock-search-input')?.value || '').toLowerCase();
+            const catVal = document.getElementById('stock-category-select')?.value || 'ALL';
+
+            const filtered = gameState.companies.filter(comp => {
+                const matchSearch = comp.name.toLowerCase().includes(searchVal) || comp.code.toLowerCase().includes(searchVal);
+                const matchCat = (catVal === 'ALL') || (comp.category === catVal);
+                return matchSearch && matchCat;
+            });
+
+            document.getElementById('stock-list-count').innerText = `${filtered.length} / 100社`;
+
+            container.innerHTML = '';
+            filtered.forEach(comp => {
+                const owned = gameState.holdings[comp.id] || 0;
+                const isSelected = comp.id === gameState.selectedCompanyId;
+                const isAcquired = owned >= comp.totalShares;
+                const isUp = comp.price >= comp.prevPrice;
+
+                const item = document.createElement('div');
+                item.onclick = () => { 
+                    gameState.selectedCompanyId = comp.id; 
+                    switchMarketSubtab('chart');
+                    updateAllUI(); 
+                };
+                item.className = `p-2.5 rounded-xl border transition cursor-pointer flex justify-between items-center ${isSelected ? 'bg-cyan-950/80 border-cyan-500' : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'}`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg text-[10px] font-bold ${isAcquired ? 'bg-amber-950 text-amber-400 border border-amber-800' : 'bg-slate-950 text-slate-400'}">
+                            ${isAcquired ? '<i class="fa-solid fa-crown"></i>' : comp.category.substring(0, 3)}
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white flex items-center gap-1">
+                                ${comp.name}
+                                ${isAcquired ? '<span class="text-[8px] bg-amber-950 text-amber-300 px-1 rounded border border-amber-800">100%</span>' : ''}
+                            </div>
+                            <div class="text-[9px] text-slate-400">保有: <span class="text-slate-200 font-mono">${owned}</span> / 1,000株</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-mono font-bold text-white">¥${comp.price.toLocaleString()}</div>
+                        <div class="text-[9px] font-mono font-semibold ${isUp ? 'text-emerald-400' : 'text-rose-400'}">
+                            ${isUp ? '▲' : '▼'} ${Math.abs((((comp.price - comp.prevPrice) / comp.prevPrice) * 100)).toFixed(1)}%
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderSectorMonitorGrid() {
+            const secGrid = document.getElementById('sector-monitor-grid');
+            if (!secGrid) return;
+
+            secGrid.innerHTML = '';
+            Object.keys(gameState.sectorModifiers).forEach(sec => {
+                const mod = gameState.sectorModifiers[sec];
+                const pct = (((mod - 1.0) * 100)).toFixed(1);
+                const isPlayerSec = sec === gameState.playerIndustry;
+                const isUp = mod >= 1.0;
+
+                const div = document.createElement('div');
+                div.className = `p-2 rounded-lg border text-[10px] flex justify-between items-center ${isPlayerSec ? 'bg-cyan-950/60 border-cyan-500/60' : 'bg-slate-950 border-slate-800'}`;
+                div.innerHTML = `
+                    <span class="font-bold ${isPlayerSec ? 'text-cyan-300' : 'text-slate-300'}">
+                        ${sec} ${isPlayerSec ? '👑' : ''}
+                    </span>
+                    <span class="font-mono font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${isUp ? '+' : ''}${pct}%
+                    </span>
+                `;
+                secGrid.appendChild(div);
+            });
+        }
+
+        function renderPortfolioTab() {
+            const grid = document.getElementById('portfolio-grid');
+            if (!grid) return;
+
+            const ownedComps = gameState.companies.filter(c => (gameState.holdings[c.id] || 0) > 0);
+            
+            if (ownedComps.length === 0) {
+                grid.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">保有株がありません。「株式市場」で株を購入してください。</div>';
+                return;
+            }
+
+            grid.innerHTML = '';
+            ownedComps.forEach(comp => {
+                const owned = gameState.holdings[comp.id];
+                const pct = ((owned / comp.totalShares) * 100).toFixed(1);
+                const value = owned * comp.price;
+                const is100 = owned >= comp.totalShares;
+
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-xl border flex justify-between items-center ${is100 ? 'bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border-amber-600/60' : 'bg-slate-900/60 border-slate-800'}`;
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-950 text-slate-400 border border-slate-800">${comp.category}</span>
+                            <h4 class="text-xs font-bold text-white">${comp.name}</h4>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1">評価額: <strong class="text-emerald-400 font-mono">¥${value.toLocaleString()}</strong> (${owned}株 / ${pct}%)</div>
+                    </div>
+                    <button onclick="selectStockAndNavigate(${comp.id})" class="text-xs text-cyan-400 font-bold px-2 py-1 bg-slate-950 rounded-lg border border-slate-800">
+                        取引 &rarr;
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function selectStockAndNavigate(compId) {
+            gameState.selectedCompanyId = compId;
+            switchTab('market');
+            switchMarketSubtab('chart');
+            updateAllUI();
+        }
+
+        /* -------------------------------------------------------------
+           8. HELPERS & UTILITIES
+           ------------------------------------------------------------- */
+        function calculateTotalAssets() {
+            let stockVal = 0;
+            gameState.companies.forEach(comp => {
+                const owned = gameState.holdings[comp.id] || 0;
+                stockVal += owned * comp.price;
+            });
+
+            let termVal = 0;
+            gameState.termDeposits.forEach(td => termVal += td.amount);
+
+            return gameState.cash + gameState.bankSavings + termVal + gameState.bonds + stockVal - gameState.bankLoan;
+        }
+
+        function getAcquiredCount() {
+            let count = 0;
+            gameState.companies.forEach(comp => {
+                if ((gameState.holdings[comp.id] || 0) >= comp.totalShares) {
+                    count++;
+                }
+            });
+            return count;
+        }
+
+        function checkVictoryCondition() {
+            const acquired = getAcquiredCount();
+            if (acquired >= 100) {
+                gameState.isPaused = true;
+                document.getElementById('vic-days').innerText = gameState.days;
+                document.getElementById('vic-assets').innerText = `¥${Math.round(calculateTotalAssets()).toLocaleString()}`;
+                
+                const modal = document.getElementById('victory-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function switchTab(tabKey) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-cyan-400');
+                btn.classList.add('text-slate-400');
+            });
+
+            const activeTab = document.getElementById(`tab-${tabKey}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+
+            const activeBtn = document.getElementById(`tab-btn-${tabKey}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-cyan-400');
+            }
+        }
+
+        function setSpeed(sp) {
+            gameState.speed = sp;
+            document.querySelectorAll('#spd-1, #spd-2, #spd-5').forEach(b => {
+                b.classList.remove('text-cyan-400', 'bg-slate-800');
+                b.classList.add('text-slate-400');
+            });
+            document.getElementById(`spd-${sp}`).className = "px-1.5 py-0.5 font-bold rounded text-cyan-400 bg-slate-800";
+            showToast(`速度: ${sp}x`, "cyan");
+        }
+
+        function togglePause() {
+            gameState.isPaused = !gameState.isPaused;
+            const icon = document.getElementById('icon-pause');
+            if (gameState.isPaused) {
+                icon.className = "fa-solid fa-play";
+                showToast("一時停止中", "amber");
+            } else {
+                icon.className = "fa-solid fa-pause";
+                showToast("再開しました", "emerald");
+            }
+        }
+
+        function addNews(msg, type = "system") {
+            const container = document.getElementById('news-log-container');
+            if (!container) return;
+
+            const item = document.createElement('div');
+            let colorClass = "border-slate-800 text-slate-300";
+            if (type === "up") colorClass = "border-emerald-800/60 bg-emerald-950/30 text-emerald-300";
+            if (type === "down") colorClass = "border-rose-800/60 bg-rose-950/30 text-rose-300";
+
+            item.className = `p-2 rounded-lg border text-[10px] font-mono flex items-start gap-1.5 ${colorClass}`;
+            item.innerHTML = `
+                <span class="text-slate-500 font-bold whitespace-nowrap">Day ${gameState.days}</span>
+                <span>${msg}</span>
+            `;
+
+            container.insertBefore(item, container.firstChild);
+            if (container.children.length > 50) container.removeChild(container.lastChild);
+        }
+
+        function showToast(msg, color = "emerald") {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const bgMap = {
+                emerald: "bg-emerald-900 border-emerald-600 text-emerald-100",
+                cyan: "bg-cyan-900 border-cyan-600 text-cyan-100",
+                rose: "bg-rose-900 border-rose-600 text-rose-100",
+                amber: "bg-amber-900 border-amber-600 text-amber-100"
+            };
+
+            toast.className = `px-3 py-1.5 rounded-xl border shadow-xl text-xs font-bold pointer-events-auto toast-animate ${bgMap[color] || bgMap.emerald}`;
+            toast.innerText = msg;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.25s ease';
+                setTimeout(() => toast.remove(), 250);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
